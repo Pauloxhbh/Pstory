@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokeRPG - Move Selector Edition</title>
+    <style>
+        /* --- CSS GERAL --- */
+        body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; margin: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .game-container { position: relative; border: 4px solid #333; background: #000; box-shadow: 0 0 30px rgba(0,0,0,0.8); width: 480px; height: 550px; }
+        
+        /* HUD & CANVAS */
+        .hud { position: absolute; top: 0; width: 100%; background: rgba(0,0,0,0.9); padding: 8px; display: flex; justify-content: space-between; border-bottom: 1px solid #444; box-sizing: border-box; z-index: 10; font-size: 12px; }
+        button { background: #444; color: #fff; border: 1px solid #666; cursor: pointer; padding: 5px 10px; border-radius: 4px; font-weight: bold; }
+        button:hover { background: #666; border-color: #999; }
+        canvas { display: block; background: #000; margin-top: 35px; }
+
+        /* LOADING */
+        #loading { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); color:white; display:flex; justify-content:center; align-items:center; z-index: 9999; display:none; flex-direction: column; }
+        
+        /* OVERLAYS */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 100; display: none; flex-direction: column; }
+        .overlay.active { display: flex; }
+
+        /* MOVE LEARNER (NOVO) */
+        #move-screen { background: rgba(0,0,0,0.95); justify-content: center; align-items: center; padding: 20px; text-align: center; }
+        .move-card { background: #333; padding: 15px; margin: 5px; border: 1px solid #555; cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: 300px; }
+        .move-card:hover { background: #d32f2f; border-color: red; } /* Hover vermelho para indicar "Esquecer" */
+        .new-move-highlight { color: #4caf50; font-size: 18px; font-weight: bold; margin: 10px 0; border: 1px solid #4caf50; padding: 10px; border-radius: 5px; }
+
+        /* START SCREEN */
+        #start-screen { background: #111; justify-content: center; align-items: center; text-align: center; }
+        .starters { display: flex; gap: 15px; margin-top: 20px; }
+        .card { background: #222; border: 2px solid #444; padding: 15px; cursor: pointer; border-radius: 8px; width: 90px; transition: 0.2s; }
+        .card:hover { border-color: gold; transform: scale(1.1); background: #333; }
+        .card img { width: 70px; height: 70px; image-rendering: pixelated; }
+
+        /* BATTLE UI */
+        .battle-scene { flex: 2; background: url('https://i.imgur.com/P4M1N68.png') no-repeat center bottom; background-size: cover; display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 30px; }
+        .fighter { text-align: center; width: 120px; text-shadow: 2px 2px 2px #000; position: relative; }
+        .fighter img { width: 130px; height: 130px; image-rendering: pixelated; }
+        
+        /* ANIMATIONS */
+        .anim-shake { animation: shake 0.5s; }
+        @keyframes shake { 0%{transform:translateX(0)} 25%{transform:translateX(-10px)} 50%{transform:translateX(10px)} 75%{transform:translateX(-10px)} 100%{transform:translateX(0)} }
+
+        /* BARS */
+        .bars { background: rgba(0,0,0,0.6); padding: 5px; border-radius: 5px; margin-bottom: 5px; border: 1px solid #555; }
+        .hp-bg { width: 100%; height: 8px; background: #555; border: 1px solid #fff; border-radius: 4px; margin-top: 2px; }
+        .hp-fill { height: 100%; background: #4caf50; width: 100%; transition: width 0.5s; }
+        .xp-bg { width: 100%; height: 4px; background: #333; margin-top: 2px; border-radius: 2px; }
+        .xp-fill { height: 100%; background: #29b6f6; width: 0%; transition: width 0.5s; }
+
+        /* CONTROLS */
+        .battle-controls { flex: 1.6; background: #fff; color: #000; padding: 10px; border-top: 4px solid #333; display: flex; flex-direction: column; }
+        .move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 5px; height: 100%; }
+        .move-btn { background: #eee; border: 2px solid #ccc; color: #333; font-weight: bold; font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; box-shadow: 0 2px #999; }
+        .move-btn:active { box-shadow: 0 0 #666; transform: translateY(2px); }
+        .move-type { font-size: 9px; padding: 1px 4px; border-radius: 3px; color: white; margin-top: 2px; text-transform: uppercase; }
+        
+        .action-bar { display: flex; gap: 5px; margin-top: 8px; }
+        .action-bar button { flex: 1; font-weight: bold; padding: 10px; border: none; }
+        .btn-run { background: #757575; } .btn-catch { background: #fbc02d; color: black; } .btn-potion { background: #4caf50; }
+
+        /* TYPES COLORS */
+        .type-normal { background:#A8A77A; } .type-fire { background:#EE8130; } .type-water { background:#6390F0; }
+        .type-grass { background:#7AC74C; } .type-electric { background:#F7D02C; } .type-ice { background:#96D9D6; }
+        .type-fighting { background:#C22E28; } .type-poison { background:#A33EA1; } .type-ground { background:#E2BF65; }
+        .type-flying { background:#A98FF3; } .type-psychic { background:#F95587; } .type-bug { background:#A6B91A; }
+        .type-rock { background:#B6A136; } .type-ghost { background:#735797; } .type-dragon { background:#6F35FC; }
+        .type-dark { background:#705746; } .type-steel { background:#B7B7CE; } .type-fairy { background:#D685AD; }
+
+        /* BOX & MENU */
+        .menu-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 10px; overflow-y: auto; height: 400px; }
+        .menu-item { background: #222; border: 1px solid #444; text-align: center; padding: 5px; font-size: 10px; }
+        .menu-item img { width: 40px; }
+    </style>
+</head>
+<body>
+
+    <div id="loading"><div>Acessando PokéNetwork...</div></div>
+
+    <div class="game-container">
+        <div id="move-screen" class="overlay">
+            <h2>Aprendizado de Golpe!</h2>
+            <p>Seu Pokémon quer aprender:</p>
+            <div id="new-move-name" class="new-move-highlight">FLAMETHROWER</div>
+            <p>Mas ele já conhece 4 golpes.</p>
+            <p style="color:#ef5350; font-size:12px;">Clique em um golpe antigo para ESQUECÊ-LO:</p>
+            
+            <div id="forget-list">
+                </div>
+            
+            <br>
+            <button onclick="cancelLearnMove()" style="background:#555; width:100%; padding:10px;">Desistir do golpe novo</button>
+        </div>
+
+        <div id="start-screen" class="overlay active">
+            <h1>PokeRPG Tactician</h1>
+            <p>Escolha seu inicial:</p>
+            <div class="starters">
+                <div class="card" onclick="startGame(1)">
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png"><br>Bulbasaur
+                </div>
+                <div class="card" onclick="startGame(4)">
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png"><br>Charmander
+                </div>
+                <div class="card" onclick="startGame(7)">
+                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png"><br>Squirtle
+                </div>
+            </div>
+            <br>
+            <button onclick="loadGame()">Carregar Jogo Salvo</button>
+        </div>
+
+        <div class="hud">
+            <div>
+                <select id="region-select" onchange="changeRegion(this.value)">
+                    <option value="kanto">Kanto</option> <option value="johto">Johto</option>
+                    <option value="hoenn">Hoenn</option> <option value="sinnoh">Sinnoh</option>
+                </select>
+                <span style="margin-left:5px" id="biome-disp">FLORESTA</span>
+            </div>
+            <div>
+                <span>💰<b id="ui-gold">0</b></span>
+                <button onclick="toggleBox()">Box</button>
+                <button onclick="saveGame()">💾</button>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="480" height="480"></canvas>
+
+        <div id="battle-screen" class="overlay">
+            <div class="battle-scene">
+                <div class="fighter">
+                    <div class="bars">
+                        <div id="enemy-name" style="font-weight:bold;">Enemy</div>
+                        <small>Lvl <span id="enemy-lvl">?</span></small>
+                        <div class="hp-bg"><div id="enemy-hp" class="hp-fill"></div></div>
+                    </div>
+                    <img id="enemy-img" src="">
+                </div>
+                <div class="fighter">
+                    <img id="player-img" src="">
+                    <div class="bars">
+                        <div id="player-name" style="font-weight:bold;">You</div>
+                        <small>Lvl <span id="player-lvl">?</span></small>
+                        <div class="hp-bg"><div id="player-hp" class="hp-fill"></div></div>
+                        <small id="hp-text">--/--</small>
+                        <div class="xp-bg"><div id="player-xp" class="xp-fill"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="battle-controls">
+                <div id="battle-msg" style="margin-bottom:5px;">O que fará?</div>
+                <div class="move-grid" id="move-buttons"></div>
+                <div class="action-bar">
+                    <button class="btn-catch" onclick="attemptCatch()">Capturar</button>
+                    <button class="btn-potion" onclick="usePotion()">Potion (<span id="qty-potion">0</span>)</button>
+                    <button class="btn-run" onclick="runAway()">Fugir</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="box-screen" class="overlay">
+            <div style="padding:10px; display:flex; justify-content:space-between; background:#333;">
+                <h2>PC Box</h2> <button onclick="toggleBox()" style="background:red;">X</button>
+            </div>
+            <div class="menu-grid" id="box-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const TILE = 48;
+
+        // --- DADOS E LÓGICA ---
+        const DB = {
+            kanto: { grass:[1,43,69,10,13], fire:[4,37,58,77], water:[7,54,60,129], normal:[16,19,21,133] },
+            johto: { grass:[152,187], fire:[155,218], water:[158,194], normal:[161,209] },
+            hoenn: { grass:[252,273], fire:[255,322], water:[258,278], normal:[261,263] },
+            sinnoh: { grass:[387,406], fire:[390,391], water:[393,418], normal:[396,399] }
+        };
+
+        const TYPE_CHART = {
+            fire: { grass:2, water:0.5, ice:2, bug:2, rock:0.5, steel:2 },
+            water: { fire:2, ground:2, rock:2, grass:0.5 },
+            grass: { water:2, ground:2, rock:2, fire:0.5, flying:0.5, bug:0.5, poison:0.5 },
+            electric: { water:2, flying:2, ground:0 },
+            // (Adicione mais se quiser, simplificado para o código não travar)
+            normal: { rock:0.5, ghost:0 }
+        };
+
+        let player = {
+            active: false,
+            x:4, y:4, px:192, py:192, moving:false, tx:0, ty:0,
+            region:'kanto', biome:'forest',
+            gold: 500, items: { potion: 5, ball: 10 },
+            pokemon: null,
+            box: []
+        };
+        let battle = { active:false, enemy:null };
+        let pendingMove = null; // Variável para armazenar o golpe pendente
+
+        // --- API CORE ---
+        async function fetchPokeData(id, level, keepMoves=false, oldMoves=[]) {
+            document.getElementById("loading").style.display = "flex";
+            try {
+                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
+                const data = await res.json();
+                
+                let hp = Math.floor(((2*data.stats[0].base_stat)*level)/100) + level + 10;
+                let atk = Math.floor(((2*data.stats[1].base_stat)*level)/100) + 5;
+                let def = Math.floor(((2*data.stats[2].base_stat)*level)/100) + 5;
+                let type = data.types[0].type.name;
+
+                let moves = [];
+                if(keepMoves) {
+                    moves = oldMoves;
+                } else {
+                    // Pega 4 moves iniciais
+                    let pool = data.moves.filter(m => m.version_group_details.some(v => v.level_learned_at <= level && v.move_learn_method.name === 'level-up'));
+                    if(pool.length < 4) pool = data.moves; // Fallback
+                    for(let i=0; i<4 && pool.length>0; i++) {
+                        let r = Math.floor(Math.random()*pool.length);
+                        moves.push(await fetchMoveDetails(pool.splice(r,1)[0].move.url));
+                    }
+                }
+
+                document.getElementById("loading").style.display = "none";
+                return {
+                    id: id, name: data.name.toUpperCase(), level: level,
+                    hp: hp, maxHp: hp, stats: { atk, def, type },
+                    xp: Math.pow(level,3), nextXp: Math.pow(level+1,3),
+                    moves: moves,
+                    sprites: { front: data.sprites.front_default, back: data.sprites.back_default, icon: data.sprites.versions["generation-viii"].icons.front_default },
+                    rawMoves: data.moves // Guarda a lista completa para checar level up depois
+                };
+            } catch(e) { console.error(e); document.getElementById("loading").style.display="none"; return null; }
+        }
+
+        async function fetchMoveDetails(url) {
+            let res = await fetch(url);
+            let data = await res.json();
+            return { name: data.name, power: data.power||0, type: data.type.name, class: data.damage_class.name };
+        }
+
+        // --- SISTEMA DE MAPA ---
+        const BIOMES = {
+            forest: { type:'grass', color:'#4caf50', tiles:grid(0), portals:[{x:8,y:1,to:'volcano'}] },
+            volcano: { type:'fire', color:'#d32f2f', tiles:grid(2), portals:[{x:1,y:8,to:'water'}] },
+            water: { type:'water', color:'#2196f3', tiles:grid(2), portals:[{x:1,y:1,to:'forest'}] }
+        };
+        function grid(t){let g=[];for(let y=0;y<10;y++){let r=[];for(let x=0;x<10;x++)r.push((x===0||x===9||y===0||y===9)?1:t);g.push(r);}g[1][1]=0;g[8][8]=3;g[1][8]=5;g[8][1]=5;return g;}
+
+        // --- GAME ENGINE ---
+        const keys={}; window.onkeydown=e=>keys[e.key]=true; window.onkeyup=e=>keys[e.key]=false;
+        function loop() { if(player.active) { update(); draw(); } requestAnimationFrame(loop); }
+
+        function update() {
+            if(battle.active || document.querySelector('.overlay.active')) return;
+            if(player.moving) {
+                let s=5;
+                if(player.px<player.tx)player.px+=s; else if(player.px>player.tx)player.px-=s;
+                if(player.py<player.ty)player.py+=s; else if(player.py>player.ty)player.py-=s;
+                if(Math.abs(player.px-player.tx)<s && Math.abs(player.py-player.ty)<s){
+                    player.px=player.tx; player.py=player.ty; player.x=Math.round(player.px/TILE); player.y=Math.round(player.py/TILE); player.moving=false; checkTile();
+                } return;
+            }
+            if(keys['ArrowUp']) move(0,-1); else if(keys['ArrowDown']) move(0,1);
+            else if(keys['ArrowLeft']) move(-1,0); else if(keys['ArrowRight']) move(1,0);
+        }
+
+        function move(dx,dy) {
+            let nx=player.x+dx, ny=player.y+dy;
+            if(BIOMES[player.biome].tiles[ny][nx]===1) return;
+            player.tx=nx*TILE; player.ty=ny*TILE; player.moving=true;
+        }
+
+        async function checkTile() {
+            let t = BIOMES[player.biome].tiles[player.y][player.x];
+            if(t===0 && Math.random()<0.2) await startBattle();
+            if(t===3) { player.pokemon.hp=player.pokemon.maxHp; alert("Curado!"); updateBars(); }
+            if(t===5) {
+                let p = BIOMES[player.biome].portals[0];
+                player.biome=p.to; player.x=4; player.y=4; player.px=192; player.py=192; player.tx=192; player.ty=192;
+                document.getElementById("biome-disp").innerText=player.biome.toUpperCase();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0,0,480,480);
+            let map = BIOMES[player.biome];
+            for(let y=0;y<10;y++) for(let x=0;x<10;x++) {
+                let t=map.tiles[y][x];
+                ctx.fillStyle = t===1?'#111':t===3?'#e91e63':t===5?'#9c27b0':map.color;
+                ctx.fillRect(x*TILE,y*TILE,TILE,TILE); ctx.strokeRect(x*TILE,y*TILE,TILE,TILE);
+                if(t===3) { ctx.fillStyle="white"; ctx.font="20px Arial"; ctx.fillText("🏥",x*TILE+12,y*TILE+32); }
+                if(t===5) { ctx.fillStyle="white"; ctx.font="20px Arial"; ctx.fillText("🌀",x*TILE+12,y*TILE+32); }
+            }
+            if(player.pokemon) drawImg(player.pokemon.sprites.icon, player.px, player.py);
+        }
+        const imgCache={}; function drawImg(u,x,y){if(!u)return;if(!imgCache[u]){imgCache[u]=new Image();imgCache[u].src=u;}if(imgCache[u].complete)ctx.drawImage(imgCache[u],x,y,TILE,TILE);}
+
+        // --- BATTLE & LEVEL UP ---
+        async function startBattle() {
+            let type = BIOMES[player.biome].type;
+            let pool = DB[player.region][type] || [129];
+            let id = pool[Math.floor(Math.random()*pool.length)];
+            let lvl = Math.max(1, player.pokemon.level + Math.floor(Math.random()*3)-1);
+            
+            battle.enemy = await fetchPokeData(id, lvl);
+            if(!battle.enemy) return;
+
+            battle.active = true;
+            document.getElementById("battle-screen").classList.add("active");
+            
+            let p = player.pokemon; let e = battle.enemy;
+            document.getElementById("enemy-img").src = e.sprites.front; document.getElementById("player-img").src = p.sprites.back;
+            document.getElementById("enemy-name").innerText = e.name; document.getElementById("enemy-lvl").innerText = e.level;
+            document.getElementById("player-name").innerText = p.name; document.getElementById("player-lvl").innerText = p.level;
+            document.getElementById("qty-potion").innerText = player.items.potion;
+            renderMoves(); updateBars();
+        }
+
+        function renderMoves() {
+            let div = document.getElementById("move-buttons"); div.innerHTML = "";
+            player.pokemon.moves.forEach((m, i) => {
+                let btn = document.createElement("button"); btn.className = "move-btn";
+                btn.innerHTML = `<span>${m.name}</span> <span class="move-type type-${m.type}">${m.type}</span>`;
+                btn.onclick = () => useMove(i);
+                div.appendChild(btn);
+            });
+        }
+
+        function useMove(i) {
+            let p = player.pokemon; let e = battle.enemy;
+            let move = p.moves[i];
+            let msg = document.getElementById("battle-msg");
+
+            // Player Attack
+            let typeMod = (TYPE_CHART[move.type] && TYPE_CHART[move.type][e.stats.type]) || 1;
+            let dmg = move.power>0 ? Math.floor((((2*p.level/5+2)*move.power*(p.stats.atk/e.stats.def))/50)*typeMod)+2 : 0;
+            if(move.class==='status') { dmg=0; e.stats.def*=0.9; msg.innerText=`${move.name}: Def inimiga caiu!`; }
+            else { e.hp -= dmg; msg.innerText = `${move.name}! ${dmg} dmg. ` + (typeMod>1?"Super Eficaz!":""); }
+            
+            shake("enemy-img"); updateBars();
+
+            if(e.hp <= 0) {
+                setTimeout(() => winBattle(e), 1000);
+            } else {
+                setTimeout(() => enemyTurn(), 1000);
+            }
+        }
+
+        function enemyTurn() {
+            let p = player.pokemon; let e = battle.enemy;
+            let move = e.moves[Math.floor(Math.random()*e.moves.length)] || {name:"Struggle", power:30, type:"normal"};
+            
+            let dmg = Math.floor((((2*e.level/5+2)*(move.power||20)*(e.stats.atk/p.stats.def))/50))+2;
+            p.hp -= dmg;
+            document.getElementById("battle-msg").innerText = `Inimigo usou ${move.name}! ${dmg} dmg.`;
+            shake("player-img"); updateBars();
+
+            if(p.hp <= 0) {
+                alert("Você desmaiou...");
+                p.hp = p.maxHp;
+                closeBattle();
+                player.x=4; player.y=4; player.px=192; player.py=192;
+            }
+        }
+
+        async function winBattle(e) {
+            let p = player.pokemon;
+            let gainedXp = Math.floor((e.level * 20)); // XP formula simples
+            p.xp += gainedXp;
+            player.gold += e.level * 10;
+            alert(`Vitória! +${gainedXp} XP, +$${e.level*10}`);
+            
+            if(p.xp >= p.nextXp) {
+                p.level++; p.maxHp+=5; p.hp=p.maxHp; p.stats.atk+=2; p.stats.def+=2; p.nextXp=Math.pow(p.level+1,3);
+                alert(`Level Up para ${p.level}!`);
+                await checkNewMove(p);
+            }
+            closeBattle();
+        }
+
+        // --- SISTEMA DE APRENDIZAGEM DE MOVIMENTOS (NOVO) ---
+        async function checkNewMove(p) {
+            // Busca na lista rawMoves se tem golpe novo nesse nivel
+            let potential = p.rawMoves.filter(m => {
+                let v = m.version_group_details[0]; // Pega o primeiro grupo de versão simplificado
+                return v.level_learned_at === p.level && v.move_learn_method.name === 'level-up';
+            });
+
+            if(potential.length > 0) {
+                // Pega o primeiro golpe encontrado
+                let moveUrl = potential[0].move.url;
+                let moveData = await fetchMoveDetails(moveUrl);
+                
+                if(p.moves.length < 4) {
+                    p.moves.push(moveData);
+                    alert(`Aprendeu ${moveData.name}!`);
+                } else {
+                    // Abre tela de decisão
+                    pendingMove = moveData;
+                    openMoveScreen(moveData);
+                }
+            }
+        }
+
+        function openMoveScreen(newMove) {
+            document.getElementById("move-screen").classList.add("active");
+            document.getElementById("new-move-name").innerText = newMove.name.toUpperCase();
+            
+            let list = document.getElementById("forget-list");
+            list.innerHTML = "";
+            player.pokemon.moves.forEach((m, i) => {
+                let div = document.createElement("div");
+                div.className = "move-card";
+                div.innerHTML = `<span>${m.name}</span> <small>${m.type}</small>`;
+                div.onclick = () => replaceMove(i);
+                list.appendChild(div);
+            });
+        }
+
+        function replaceMove(index) {
+            let oldName = player.pokemon.moves[index].name;
+            player.pokemon.moves[index] = pendingMove;
+            alert(`Esqueceu ${oldName} e aprendeu ${pendingMove.name}!`);
+            document.getElementById("move-screen").classList.remove("active");
+            pendingMove = null;
+        }
+
+        function cancelLearnMove() {
+            alert(`Desistiu de aprender ${pendingMove.name}.`);
+            document.getElementById("move-screen").classList.remove("active");
+            pendingMove = null;
+        }
+
+        // --- UTILIDADES ---
+        function updateBars() {
+            let p=player.pokemon; let e=battle.enemy;
+            if(e) document.getElementById("enemy-hp").style.width=(Math.max(0,e.hp/e.maxHp)*100)+"%";
+            if(p) {
+                document.getElementById("player-hp").style.width=(Math.max(0,p.hp/p.maxHp)*100)+"%";
+                document.getElementById("hp-text").innerText=`${p.hp}/${p.maxHp}`;
+                let cur=Math.pow(p.level,3); let nxt=Math.pow(p.level+1,3);
+                document.getElementById("player-xp").style.width=((p.xp-cur)/(nxt-cur)*100)+"%";
+            }
+        }
+        function shake(id){ let el=document.getElementById(id); el.classList.remove("anim-shake"); void el.offsetWidth; el.classList.add("anim-shake"); }
+        function closeBattle() { battle.active=false; document.getElementById("battle-screen").classList.remove("active"); document.getElementById("ui-gold").innerText=player.gold; }
+        
+        async function startGame(id) { 
+            let p = await fetchPokeData(id, 5); 
+            if(p) { player.pokemon=p; player.active=true; document.getElementById("start-screen").classList.remove("active"); updateBars(); loop(); } 
+        }
+        function attemptCatch() { 
+            if(player.items.ball>0){ player.items.ball--; if(Math.random()>0.3){ player.box.push(battle.enemy); alert("Capturado!"); closeBattle(); }else alert("Escapou!"); }else alert("Sem bolas!"); 
+            document.getElementById("ui-gold").innerText = player.gold;
+        }
+        function usePotion(){ 
+            if(player.items.potion>0){ player.items.potion--; player.pokemon.hp=Math.min(player.pokemon.hp+20,player.pokemon.maxHp); updateBars(); document.getElementById("qty-potion").innerText=player.items.potion; } 
+        }
+        function runAway(){ closeBattle(); }
+        function toggleBox(){ 
+            let el=document.getElementById("box-screen"); el.classList.toggle("active"); 
+            if(el.classList.contains("active")) document.getElementById("box-grid").innerHTML = player.box.map(p=>`<div class="menu-item"><img src="${p.sprites.icon}"><br>${p.name}</div>`).join(''); 
+        }
+        function saveGame(){ localStorage.setItem('poke_tactician', JSON.stringify(player)); alert("Salvo!"); }
+        function loadGame(){ let d=localStorage.getItem('poke_tactician'); if(d){ player=JSON.parse(d); player.active=true; document.getElementById("start-screen").classList.remove("active"); loop(); }else alert("Sem save."); }
+        function changeRegion(v){ player.region=v; canvas.focus(); }
+
+    </script>
+</body>
+</html>
