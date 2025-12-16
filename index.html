@@ -2,279 +2,304 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PokeRPG - Move Selector Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PokeRPG Mobile</title>
     <style>
-        /* --- CSS GERAL --- */
-        body { background: #121212; color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; margin: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        .game-container { position: relative; border: 4px solid #333; background: #000; box-shadow: 0 0 30px rgba(0,0,0,0.8); width: 480px; height: 550px; }
-        
-        /* HUD & CANVAS */
-        .hud { position: absolute; top: 0; width: 100%; background: rgba(0,0,0,0.9); padding: 8px; display: flex; justify-content: space-between; border-bottom: 1px solid #444; box-sizing: border-box; z-index: 10; font-size: 12px; }
-        button { background: #444; color: #fff; border: 1px solid #666; cursor: pointer; padding: 5px 10px; border-radius: 4px; font-weight: bold; }
-        button:hover { background: #666; border-color: #999; }
-        canvas { display: block; background: #000; margin-top: 35px; }
+        /* --- CSS MOBILE FIRST --- */
+        body { 
+            background: #121212; color: white; font-family: 'Segoe UI', sans-serif; 
+            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center;
+        }
 
-        /* LOADING */
-        #loading { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); color:white; display:flex; justify-content:center; align-items:center; z-index: 9999; display:none; flex-direction: column; }
-        
-        /* OVERLAYS */
-        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 100; display: none; flex-direction: column; }
+        /* Container do Jogo Ajustável */
+        .game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 480px; /* No PC não fica gigante */
+            height: 100%;
+            max-height: 800px;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HUD (Barra de cima) */
+        .hud { 
+            background: #222; padding: 10px; display: flex; justify-content: space-between; 
+            border-bottom: 2px solid #444; font-size: 12px; height: 40px; box-sizing: border-box;
+        }
+        .hud select, .hud button { background: #444; color: white; border: 1px solid #666; border-radius: 4px; }
+
+        /* CANVAS RESPONSIVO */
+        .canvas-container {
+            flex: 1; /* Ocupa o espaço que sobrar */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        canvas { 
+            background: #000; 
+            /* O Canvas vai renderizar pixelado, mas o CSS vai esticar para caber na tela */
+            width: 100%; 
+            height: auto;
+            image-rendering: pixelated; 
+        }
+
+        /* CONTROLES VIRTUAIS (D-PAD) */
+        .controls-layer {
+            height: 180px; /* Área dos botões embaixo */
+            background: #1a1a1a;
+            border-top: 2px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            user-select: none; /* Impede selecionar texto ao segurar */
+        }
+
+        /* D-PAD (Cruz) */
+        .d-pad {
+            position: relative; width: 120px; height: 120px;
+        }
+        .d-btn {
+            position: absolute; width: 40px; height: 40px; background: #444; border: 1px solid #222; border-radius: 5px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            box-shadow: 0 4px 0 #111;
+        }
+        .d-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #111; background: #666; }
+        .d-up { top: 0; left: 40px; }
+        .d-down { bottom: 0; left: 40px; }
+        .d-left { top: 40px; left: 0; }
+        .d-right { top: 40px; right: 0; }
+
+        /* Action Buttons (A B) */
+        .action-btns { display: flex; gap: 15px; }
+        .a-btn, .b-btn {
+            width: 50px; height: 50px; border-radius: 50%; border: 2px solid #222;
+            color: white; font-weight: bold; font-size: 18px;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 0 #111; cursor: pointer;
+        }
+        .a-btn { background: #d32f2f; margin-top: -20px; } /* Botão A mais alto */
+        .b-btn { background: #fbc02d; color: black; margin-top: 20px; }
+        .a-btn:active, .b-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        /* OVERLAYS (Telas Cheias) */
+        .overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #111; z-index: 99; display: none; flex-direction: column; 
+        }
         .overlay.active { display: flex; }
 
-        /* MOVE LEARNER (NOVO) */
-        #move-screen { background: rgba(0,0,0,0.95); justify-content: center; align-items: center; padding: 20px; text-align: center; }
-        .move-card { background: #333; padding: 15px; margin: 5px; border: 1px solid #555; cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: 300px; }
-        .move-card:hover { background: #d32f2f; border-color: red; } /* Hover vermelho para indicar "Esquecer" */
-        .new-move-highlight { color: #4caf50; font-size: 18px; font-weight: bold; margin: 10px 0; border: 1px solid #4caf50; padding: 10px; border-radius: 5px; }
+        /* LOADER */
+        #loading { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999; display:none; justify-content:center; align-items:center; color:white;}
 
-        /* START SCREEN */
-        #start-screen { background: #111; justify-content: center; align-items: center; text-align: center; }
-        .starters { display: flex; gap: 15px; margin-top: 20px; }
-        .card { background: #222; border: 2px solid #444; padding: 15px; cursor: pointer; border-radius: 8px; width: 90px; transition: 0.2s; }
-        .card:hover { border-color: gold; transform: scale(1.1); background: #333; }
-        .card img { width: 70px; height: 70px; image-rendering: pixelated; }
-
-        /* BATTLE UI */
-        .battle-scene { flex: 2; background: url('https://i.imgur.com/P4M1N68.png') no-repeat center bottom; background-size: cover; display: flex; justify-content: space-between; align-items: flex-end; padding: 10px 30px; }
-        .fighter { text-align: center; width: 120px; text-shadow: 2px 2px 2px #000; position: relative; }
-        .fighter img { width: 130px; height: 130px; image-rendering: pixelated; }
+        /* ESTILOS DE BATALHA ADAPTADOS */
+        .battle-scene { flex: 2; background: url('https://i.imgur.com/P4M1N68.png') no-repeat center bottom; background-size: cover; position: relative; }
+        .fighter { position: absolute; width: 120px; text-align: center; }
+        .fighter img { width: 100px; height: 100px; image-rendering: pixelated; }
+        .fighter-enemy { top: 20px; right: 20px; }
+        .fighter-player { bottom: 20px; left: 20px; }
         
-        /* ANIMATIONS */
-        .anim-shake { animation: shake 0.5s; }
-        @keyframes shake { 0%{transform:translateX(0)} 25%{transform:translateX(-10px)} 50%{transform:translateX(10px)} 75%{transform:translateX(-10px)} 100%{transform:translateX(0)} }
+        .bars { background: rgba(0,0,0,0.7); padding: 4px; border-radius: 4px; color: white; font-size: 10px; margin-bottom: 5px; }
+        .hp-bg { width: 100%; height: 6px; background: #555; margin-top: 2px; }
+        .hp-fill { height: 100%; background: #4caf50; width: 100%; transition: width 0.3s; }
 
-        /* BARS */
-        .bars { background: rgba(0,0,0,0.6); padding: 5px; border-radius: 5px; margin-bottom: 5px; border: 1px solid #555; }
-        .hp-bg { width: 100%; height: 8px; background: #555; border: 1px solid #fff; border-radius: 4px; margin-top: 2px; }
-        .hp-fill { height: 100%; background: #4caf50; width: 100%; transition: width 0.5s; }
-        .xp-bg { width: 100%; height: 4px; background: #333; margin-top: 2px; border-radius: 2px; }
-        .xp-fill { height: 100%; background: #29b6f6; width: 0%; transition: width 0.5s; }
+        .battle-controls { height: 45%; background: white; border-top: 4px solid #333; padding: 10px; color: black; display: flex; flex-direction: column; }
+        .move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; flex: 1; }
+        .move-btn { background: #f0f0f0; border: 2px solid #ccc; border-radius: 5px; font-size: 12px; font-weight: bold; }
+        .action-row { display: flex; gap: 5px; margin-top: 5px; }
+        .action-row button { flex: 1; padding: 10px; border: none; font-weight: bold; color: white; border-radius: 4px; }
 
-        /* CONTROLS */
-        .battle-controls { flex: 1.6; background: #fff; color: #000; padding: 10px; border-top: 4px solid #333; display: flex; flex-direction: column; }
-        .move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 5px; height: 100%; }
-        .move-btn { background: #eee; border: 2px solid #ccc; color: #333; font-weight: bold; font-size: 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; box-shadow: 0 2px #999; }
-        .move-btn:active { box-shadow: 0 0 #666; transform: translateY(2px); }
-        .move-type { font-size: 9px; padding: 1px 4px; border-radius: 3px; color: white; margin-top: 2px; text-transform: uppercase; }
-        
-        .action-bar { display: flex; gap: 5px; margin-top: 8px; }
-        .action-bar button { flex: 1; font-weight: bold; padding: 10px; border: none; }
-        .btn-run { background: #757575; } .btn-catch { background: #fbc02d; color: black; } .btn-potion { background: #4caf50; }
-
-        /* TYPES COLORS */
-        .type-normal { background:#A8A77A; } .type-fire { background:#EE8130; } .type-water { background:#6390F0; }
-        .type-grass { background:#7AC74C; } .type-electric { background:#F7D02C; } .type-ice { background:#96D9D6; }
-        .type-fighting { background:#C22E28; } .type-poison { background:#A33EA1; } .type-ground { background:#E2BF65; }
-        .type-flying { background:#A98FF3; } .type-psychic { background:#F95587; } .type-bug { background:#A6B91A; }
-        .type-rock { background:#B6A136; } .type-ghost { background:#735797; } .type-dragon { background:#6F35FC; }
-        .type-dark { background:#705746; } .type-steel { background:#B7B7CE; } .type-fairy { background:#D685AD; }
-
-        /* BOX & MENU */
-        .menu-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 10px; overflow-y: auto; height: 400px; }
-        .menu-item { background: #222; border: 1px solid #444; text-align: center; padding: 5px; font-size: 10px; }
-        .menu-item img { width: 40px; }
+        /* MENUS */
+        .menu-list { overflow-y: auto; flex: 1; padding: 10px; }
+        .menu-item { background: #333; margin-bottom: 5px; padding: 10px; display: flex; align-items: center; gap: 10px; border: 1px solid #555; }
+        .new-move-highlight { color: #4caf50; border: 1px solid #4caf50; padding: 10px; margin: 10px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div id="loading"><div>Acessando PokéNetwork...</div></div>
+    <div id="loading">Carregando...</div>
 
-    <div class="game-container">
-        <div id="move-screen" class="overlay">
-            <h2>Aprendizado de Golpe!</h2>
-            <p>Seu Pokémon quer aprender:</p>
-            <div id="new-move-name" class="new-move-highlight">FLAMETHROWER</div>
-            <p>Mas ele já conhece 4 golpes.</p>
-            <p style="color:#ef5350; font-size:12px;">Clique em um golpe antigo para ESQUECÊ-LO:</p>
-            
-            <div id="forget-list">
-                </div>
-            
-            <br>
-            <button onclick="cancelLearnMove()" style="background:#555; width:100%; padding:10px;">Desistir do golpe novo</button>
-        </div>
-
-        <div id="start-screen" class="overlay active">
-            <h1>PokeRPG Tactician</h1>
-            <p>Escolha seu inicial:</p>
-            <div class="starters">
-                <div class="card" onclick="startGame(1)">
-                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png"><br>Bulbasaur
-                </div>
-                <div class="card" onclick="startGame(4)">
-                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png"><br>Charmander
-                </div>
-                <div class="card" onclick="startGame(7)">
-                    <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png"><br>Squirtle
-                </div>
-            </div>
-            <br>
-            <button onclick="loadGame()">Carregar Jogo Salvo</button>
-        </div>
-
+    <div class="game-wrapper">
+        
         <div class="hud">
             <div>
-                <select id="region-select" onchange="changeRegion(this.value)">
+                <select onchange="changeRegion(this.value)">
                     <option value="kanto">Kanto</option> <option value="johto">Johto</option>
-                    <option value="hoenn">Hoenn</option> <option value="sinnoh">Sinnoh</option>
+                    <option value="hoenn">Hoenn</option>
                 </select>
-                <span style="margin-left:5px" id="biome-disp">FLORESTA</span>
             </div>
-            <div>
-                <span>💰<b id="ui-gold">0</b></span>
-                <button onclick="toggleBox()">Box</button>
-                <button onclick="saveGame()">💾</button>
-            </div>
+            <div>💰<b id="ui-gold">0</b></div>
         </div>
 
-        <canvas id="gameCanvas" width="480" height="480"></canvas>
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="320" height="320"></canvas>
+            
+            <div id="start-screen" class="overlay active" style="align-items:center; justify-content:center; text-align:center;">
+                <h1 style="color:#fbc02d">PokeRPG Mobile</h1>
+                <p>Toque para escolher:</p>
+                <div style="display:flex; gap:10px;">
+                    <div onclick="startGame(1)" style="padding:10px; border:1px solid #555;">🌱<br>Bulba</div>
+                    <div onclick="startGame(4)" style="padding:10px; border:1px solid #555;">🔥<br>Char</div>
+                    <div onclick="startGame(7)" style="padding:10px; border:1px solid #555;">💧<br>Squir</div>
+                </div>
+                <br>
+                <button onclick="loadGame()" style="padding:15px; width:200px; font-size:16px;">Carregar Save</button>
+            </div>
 
-        <div id="battle-screen" class="overlay">
-            <div class="battle-scene">
-                <div class="fighter">
-                    <div class="bars">
-                        <div id="enemy-name" style="font-weight:bold;">Enemy</div>
-                        <small>Lvl <span id="enemy-lvl">?</span></small>
-                        <div class="hp-bg"><div id="enemy-hp" class="hp-fill"></div></div>
+            <div id="battle-screen" class="overlay">
+                <div class="battle-scene">
+                    <div class="fighter fighter-enemy">
+                        <div class="bars">
+                            <b id="e-name">Enemy</b> Lv<span id="e-lvl"></span>
+                            <div class="hp-bg"><div id="e-hp" class="hp-fill"></div></div>
+                        </div>
+                        <img id="e-img" src="">
                     </div>
-                    <img id="enemy-img" src="">
+                    <div class="fighter fighter-player">
+                        <img id="p-img" src="">
+                        <div class="bars">
+                            <b id="p-name">You</b> Lv<span id="p-lvl"></span>
+                            <div class="hp-bg"><div id="p-hp" class="hp-fill"></div></div>
+                            <div style="height:2px; background:#333; margin-top:2px"><div id="p-xp" style="height:100%; background:#29b6f6; width:0%"></div></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="fighter">
-                    <img id="player-img" src="">
-                    <div class="bars">
-                        <div id="player-name" style="font-weight:bold;">You</div>
-                        <small>Lvl <span id="player-lvl">?</span></small>
-                        <div class="hp-bg"><div id="player-hp" class="hp-fill"></div></div>
-                        <small id="hp-text">--/--</small>
-                        <div class="xp-bg"><div id="player-xp" class="xp-fill"></div></div>
+                <div class="battle-controls">
+                    <div id="battle-msg" style="margin-bottom:5px; font-weight:bold;">Sua vez!</div>
+                    <div class="move-grid" id="move-grid"></div>
+                    <div class="action-row">
+                        <button style="background:#fbc02d; color:black" onclick="attemptCatch()">Capturar</button>
+                        <button style="background:#4caf50" onclick="usePotion()">Potion (<span id="n-pot"></span>)</button>
+                        <button style="background:#757575" onclick="runAway()">Fugir</button>
                     </div>
                 </div>
             </div>
-            <div class="battle-controls">
-                <div id="battle-msg" style="margin-bottom:5px;">O que fará?</div>
-                <div class="move-grid" id="move-buttons"></div>
-                <div class="action-bar">
-                    <button class="btn-catch" onclick="attemptCatch()">Capturar</button>
-                    <button class="btn-potion" onclick="usePotion()">Potion (<span id="qty-potion">0</span>)</button>
-                    <button class="btn-run" onclick="runAway()">Fugir</button>
+
+            <div id="menu-overlay" class="overlay" style="padding:10px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <h2 id="menu-title">Menu</h2> <button onclick="closeMenu()" style="background:red">X</button>
                 </div>
+                <div id="menu-content" class="menu-list"></div>
             </div>
+
         </div>
 
-        <div id="box-screen" class="overlay">
-            <div style="padding:10px; display:flex; justify-content:space-between; background:#333;">
-                <h2>PC Box</h2> <button onclick="toggleBox()" style="background:red;">X</button>
+        <div class="controls-layer">
+            <div class="d-pad">
+                <div class="d-btn d-up" onmousedown="inputSet('up',1)" onmouseup="inputSet('up',0)" ontouchstart="inputSet('up',1)" ontouchend="inputSet('up',0)">▲</div>
+                <div class="d-btn d-left" onmousedown="inputSet('left',1)" onmouseup="inputSet('left',0)" ontouchstart="inputSet('left',1)" ontouchend="inputSet('left',0)">◀</div>
+                <div class="d-btn d-right" onmousedown="inputSet('right',1)" onmouseup="inputSet('right',0)" ontouchstart="inputSet('right',1)" ontouchend="inputSet('right',0)">▶</div>
+                <div class="d-btn d-down" onmousedown="inputSet('down',1)" onmouseup="inputSet('down',0)" ontouchstart="inputSet('down',1)" ontouchend="inputSet('down',0)">▼</div>
             </div>
-            <div class="menu-grid" id="box-grid"></div>
+            
+            <div class="action-btns">
+                <div class="b-btn" onclick="openBox()">B</div> <div class="a-btn" onclick="saveGame()">A</div> </div>
         </div>
     </div>
 
     <script>
+        // --- CONFIGURAÇÃO ---
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-        const TILE = 48;
+        const TILE = 32; // Tiles menores para caber mais no mapa mobile (320px / 32 = 10 blocos)
+        
+        // --- INPUT STATE (Para segurar botão) ---
+        const input = { up: false, down: false, left: false, right: false };
+        function inputSet(key, state) {
+            // Evita comportamento padrão de zoom no touch
+            if(event.cancelable && event.type === 'touchstart') event.preventDefault();
+            input[key] = state === 1;
+        }
+        // Suporte Teclado PC também
+        window.onkeydown = e => { if(e.key==='ArrowUp') input.up=true; if(e.key==='ArrowDown') input.down=true; if(e.key==='ArrowLeft') input.left=true; if(e.key==='ArrowRight') input.right=true; };
+        window.onkeyup = e => { if(e.key==='ArrowUp') input.up=false; if(e.key==='ArrowDown') input.down=false; if(e.key==='ArrowLeft') input.left=false; if(e.key==='ArrowRight') input.right=false; };
 
-        // --- DADOS E LÓGICA ---
+        // --- DADOS ---
         const DB = {
-            kanto: { grass:[1,43,69,10,13], fire:[4,37,58,77], water:[7,54,60,129], normal:[16,19,21,133] },
-            johto: { grass:[152,187], fire:[155,218], water:[158,194], normal:[161,209] },
-            hoenn: { grass:[252,273], fire:[255,322], water:[258,278], normal:[261,263] },
-            sinnoh: { grass:[387,406], fire:[390,391], water:[393,418], normal:[396,399] }
+            kanto: { grass:[1,43,69,10,13,16,19,21], fire:[4,37,58,77], water:[7,54,60,129] },
+            johto: { grass:[152,187], fire:[155,218], water:[158,194] },
+            hoenn: { grass:[252,273], fire:[255,322], water:[258,278] }
         };
+        const TYPE_MOD = { fire:{grass:2,water:0.5}, water:{fire:2,grass:0.5}, grass:{water:2,fire:0.5}, electric:{water:2} };
 
-        const TYPE_CHART = {
-            fire: { grass:2, water:0.5, ice:2, bug:2, rock:0.5, steel:2 },
-            water: { fire:2, ground:2, rock:2, grass:0.5 },
-            grass: { water:2, ground:2, rock:2, fire:0.5, flying:0.5, bug:0.5, poison:0.5 },
-            electric: { water:2, flying:2, ground:0 },
-            // (Adicione mais se quiser, simplificado para o código não travar)
-            normal: { rock:0.5, ghost:0 }
-        };
-
-        let player = {
-            active: false,
-            x:4, y:4, px:192, py:192, moving:false, tx:0, ty:0,
-            region:'kanto', biome:'forest',
-            gold: 500, items: { potion: 5, ball: 10 },
-            pokemon: null,
-            box: []
-        };
+        let player = { active:false, x:4, y:4, px:128, py:128, moving:false, tx:0, ty:0, region:'kanto', biome:'forest', gold:300, items:{potion:5,ball:10}, pokemon:null, box:[] };
         let battle = { active:false, enemy:null };
-        let pendingMove = null; // Variável para armazenar o golpe pendente
+        let pendingMove = null;
 
-        // --- API CORE ---
-        async function fetchPokeData(id, level, keepMoves=false, oldMoves=[]) {
-            document.getElementById("loading").style.display = "flex";
+        // --- API ---
+        async function fetchPoke(id, lvl) {
+            document.getElementById("loading").style.display="flex";
             try {
-                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
-                const data = await res.json();
+                let res = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`);
+                let d = await res.json();
                 
-                let hp = Math.floor(((2*data.stats[0].base_stat)*level)/100) + level + 10;
-                let atk = Math.floor(((2*data.stats[1].base_stat)*level)/100) + 5;
-                let def = Math.floor(((2*data.stats[2].base_stat)*level)/100) + 5;
-                let type = data.types[0].type.name;
-
+                // Moves (Simplificado: Pega 4 aleatorios do total)
                 let moves = [];
-                if(keepMoves) {
-                    moves = oldMoves;
-                } else {
-                    // Pega 4 moves iniciais
-                    let pool = data.moves.filter(m => m.version_group_details.some(v => v.level_learned_at <= level && v.move_learn_method.name === 'level-up'));
-                    if(pool.length < 4) pool = data.moves; // Fallback
-                    for(let i=0; i<4 && pool.length>0; i++) {
-                        let r = Math.floor(Math.random()*pool.length);
-                        moves.push(await fetchMoveDetails(pool.splice(r,1)[0].move.url));
-                    }
+                let pool = d.moves.filter(m => m.version_group_details[0].level_learned_at <= lvl);
+                if(pool.length<4) pool = d.moves;
+                for(let i=0; i<4 && pool.length>0; i++) {
+                    let r = Math.floor(Math.random()*pool.length);
+                    let mUrl = pool.splice(r,1)[0].move.url;
+                    let mRes = await fetch(mUrl);
+                    let mD = await mRes.json();
+                    moves.push({ name:mD.name, power:mD.power||0, type:mD.type.name, class:mD.damage_class.name });
                 }
 
-                document.getElementById("loading").style.display = "none";
+                document.getElementById("loading").style.display="none";
+                let hp = Math.floor((d.stats[0].base_stat*2*lvl)/100)+lvl+10;
                 return {
-                    id: id, name: data.name.toUpperCase(), level: level,
-                    hp: hp, maxHp: hp, stats: { atk, def, type },
-                    xp: Math.pow(level,3), nextXp: Math.pow(level+1,3),
-                    moves: moves,
-                    sprites: { front: data.sprites.front_default, back: data.sprites.back_default, icon: data.sprites.versions["generation-viii"].icons.front_default },
-                    rawMoves: data.moves // Guarda a lista completa para checar level up depois
+                    id:id, name:d.name, lvl:lvl, hp:hp, maxHp:hp, 
+                    atk:d.stats[1].base_stat, def:d.stats[2].base_stat, type:d.types[0].type.name,
+                    xp:Math.pow(lvl,3), nextXp:Math.pow(lvl+1,3),
+                    moves:moves, sprites:d.sprites, rawMoves:d.moves
                 };
-            } catch(e) { console.error(e); document.getElementById("loading").style.display="none"; return null; }
+            } catch(e) { document.getElementById("loading").style.display="none"; return null; }
         }
 
-        async function fetchMoveDetails(url) {
-            let res = await fetch(url);
-            let data = await res.json();
-            return { name: data.name, power: data.power||0, type: data.type.name, class: data.damage_class.name };
-        }
-
-        // --- SISTEMA DE MAPA ---
+        // --- MAPA ---
         const BIOMES = {
-            forest: { type:'grass', color:'#4caf50', tiles:grid(0), portals:[{x:8,y:1,to:'volcano'}] },
-            volcano: { type:'fire', color:'#d32f2f', tiles:grid(2), portals:[{x:1,y:8,to:'water'}] },
-            water: { type:'water', color:'#2196f3', tiles:grid(2), portals:[{x:1,y:1,to:'forest'}] }
+            forest: { type:'grass', color:'#4caf50', tiles:grid(0), portal:{x:8,y:1,to:'volcano'} },
+            volcano: { type:'fire', color:'#d32f2f', tiles:grid(2), portal:{x:1,y:8,to:'water'} },
+            water: { type:'water', color:'#2196f3', tiles:grid(2), portal:{x:1,y:1,to:'forest'} }
         };
         function grid(t){let g=[];for(let y=0;y<10;y++){let r=[];for(let x=0;x<10;x++)r.push((x===0||x===9||y===0||y===9)?1:t);g.push(r);}g[1][1]=0;g[8][8]=3;g[1][8]=5;g[8][1]=5;return g;}
 
-        // --- GAME ENGINE ---
-        const keys={}; window.onkeydown=e=>keys[e.key]=true; window.onkeyup=e=>keys[e.key]=false;
+        // --- ENGINE ---
         function loop() { if(player.active) { update(); draw(); } requestAnimationFrame(loop); }
 
         function update() {
             if(battle.active || document.querySelector('.overlay.active')) return;
+
+            // Movimento Pixel
             if(player.moving) {
-                let s=5;
+                let s=4; // Velocidade
                 if(player.px<player.tx)player.px+=s; else if(player.px>player.tx)player.px-=s;
                 if(player.py<player.ty)player.py+=s; else if(player.py>player.ty)player.py-=s;
-                if(Math.abs(player.px-player.tx)<s && Math.abs(player.py-player.ty)<s){
-                    player.px=player.tx; player.py=player.ty; player.x=Math.round(player.px/TILE); player.y=Math.round(player.py/TILE); player.moving=false; checkTile();
-                } return;
+                
+                if(Math.abs(player.px-player.tx)<s && Math.abs(player.py-player.ty)<s) {
+                    player.px=player.tx; player.py=player.ty; 
+                    player.x=Math.round(player.px/TILE); player.y=Math.round(player.py/TILE);
+                    player.moving=false; 
+                    checkTile();
+                }
+                return;
             }
-            if(keys['ArrowUp']) move(0,-1); else if(keys['ArrowDown']) move(0,1);
-            else if(keys['ArrowLeft']) move(-1,0); else if(keys['ArrowRight']) move(1,0);
+
+            // Input Check
+            if(input.up) move(0,-1); else if(input.down) move(0,1);
+            else if(input.left) move(-1,0); else if(input.right) move(1,0);
         }
 
-        function move(dx,dy) {
+        function move(dx, dy) {
             let nx=player.x+dx, ny=player.y+dy;
-            if(BIOMES[player.biome].tiles[ny][nx]===1) return;
+            let map=BIOMES[player.biome];
+            if(nx<0||nx>9||ny<0||ny>9||map.tiles[ny][nx]===1) return;
             player.tx=nx*TILE; player.ty=ny*TILE; player.moving=true;
         }
 
@@ -282,196 +307,161 @@
             let t = BIOMES[player.biome].tiles[player.y][player.x];
             if(t===0 && Math.random()<0.2) await startBattle();
             if(t===3) { player.pokemon.hp=player.pokemon.maxHp; alert("Curado!"); updateBars(); }
-            if(t===5) {
-                let p = BIOMES[player.biome].portals[0];
-                player.biome=p.to; player.x=4; player.y=4; player.px=192; player.py=192; player.tx=192; player.ty=192;
-                document.getElementById("biome-disp").innerText=player.biome.toUpperCase();
+            if(t===5) { 
+                player.biome=BIOMES[player.biome].portal.to; 
+                player.x=4; player.y=4; player.px=4*TILE; player.py=4*TILE; player.tx=4*TILE; player.ty=4*TILE;
+                alert("Mapa: "+player.biome);
             }
         }
 
         function draw() {
-            ctx.clearRect(0,0,480,480);
+            ctx.clearRect(0,0,320,320);
             let map = BIOMES[player.biome];
             for(let y=0;y<10;y++) for(let x=0;x<10;x++) {
                 let t=map.tiles[y][x];
                 ctx.fillStyle = t===1?'#111':t===3?'#e91e63':t===5?'#9c27b0':map.color;
-                ctx.fillRect(x*TILE,y*TILE,TILE,TILE); ctx.strokeRect(x*TILE,y*TILE,TILE,TILE);
-                if(t===3) { ctx.fillStyle="white"; ctx.font="20px Arial"; ctx.fillText("🏥",x*TILE+12,y*TILE+32); }
-                if(t===5) { ctx.fillStyle="white"; ctx.font="20px Arial"; ctx.fillText("🌀",x*TILE+12,y*TILE+32); }
+                ctx.fillRect(x*TILE,y*TILE,TILE,TILE);
+                // Grid leve
+                ctx.strokeStyle="rgba(0,0,0,0.1)"; ctx.strokeRect(x*TILE,y*TILE,TILE,TILE);
+                if(t===3)ctx.fillText("🏥",x*TILE+8,y*TILE+24);
+                if(t===5)ctx.fillText("🌀",x*TILE+8,y*TILE+24);
             }
-            if(player.pokemon) drawImg(player.pokemon.sprites.icon, player.px, player.py);
+            // Player
+            if(player.pokemon) {
+                // Desenha ícone
+                let i=new Image(); i.src=player.pokemon.sprites.versions["generation-viii"].icons.front_default;
+                ctx.drawImage(i, player.px-8, player.py-8, 48, 48); // Um pouco maior que o tile
+            }
         }
-        const imgCache={}; function drawImg(u,x,y){if(!u)return;if(!imgCache[u]){imgCache[u]=new Image();imgCache[u].src=u;}if(imgCache[u].complete)ctx.drawImage(imgCache[u],x,y,TILE,TILE);}
 
-        // --- BATTLE & LEVEL UP ---
+        // --- BATTLE ---
         async function startBattle() {
             let type = BIOMES[player.biome].type;
             let pool = DB[player.region][type] || [129];
             let id = pool[Math.floor(Math.random()*pool.length)];
-            let lvl = Math.max(1, player.pokemon.level + Math.floor(Math.random()*3)-1);
+            let lvl = Math.max(1, player.pokemon.lvl + Math.floor(Math.random()*3)-1);
             
-            battle.enemy = await fetchPokeData(id, lvl);
+            battle.enemy = await fetchPoke(id, lvl);
             if(!battle.enemy) return;
 
-            battle.active = true;
+            battle.active=true;
             document.getElementById("battle-screen").classList.add("active");
             
-            let p = player.pokemon; let e = battle.enemy;
-            document.getElementById("enemy-img").src = e.sprites.front; document.getElementById("player-img").src = p.sprites.back;
-            document.getElementById("enemy-name").innerText = e.name; document.getElementById("enemy-lvl").innerText = e.level;
-            document.getElementById("player-name").innerText = p.name; document.getElementById("player-lvl").innerText = p.level;
-            document.getElementById("qty-potion").innerText = player.items.potion;
-            renderMoves(); updateBars();
-        }
+            let p=player.pokemon, e=battle.enemy;
+            document.getElementById("e-img").src=e.sprites.front_default; document.getElementById("p-img").src=p.sprites.back_default;
+            document.getElementById("e-name").innerText=e.name; document.getElementById("e-lvl").innerText=e.lvl;
+            document.getElementById("p-name").innerText=p.name; document.getElementById("p-lvl").innerText=p.lvl;
+            document.getElementById("n-pot").innerText=player.items.potion;
 
-        function renderMoves() {
-            let div = document.getElementById("move-buttons"); div.innerHTML = "";
-            player.pokemon.moves.forEach((m, i) => {
-                let btn = document.createElement("button"); btn.className = "move-btn";
-                btn.innerHTML = `<span>${m.name}</span> <span class="move-type type-${m.type}">${m.type}</span>`;
-                btn.onclick = () => useMove(i);
-                div.appendChild(btn);
+            let grid = document.getElementById("move-grid"); grid.innerHTML="";
+            p.moves.forEach((m,i)=>{
+                let b=document.createElement("button"); b.className="move-btn";
+                b.innerHTML=`${m.name}<br><small>${m.type}</small>`;
+                b.onclick=()=>useMove(i);
+                grid.appendChild(b);
             });
+            updateBars();
         }
 
         function useMove(i) {
-            let p = player.pokemon; let e = battle.enemy;
-            let move = p.moves[i];
-            let msg = document.getElementById("battle-msg");
-
-            // Player Attack
-            let typeMod = (TYPE_CHART[move.type] && TYPE_CHART[move.type][e.stats.type]) || 1;
-            let dmg = move.power>0 ? Math.floor((((2*p.level/5+2)*move.power*(p.stats.atk/e.stats.def))/50)*typeMod)+2 : 0;
-            if(move.class==='status') { dmg=0; e.stats.def*=0.9; msg.innerText=`${move.name}: Def inimiga caiu!`; }
-            else { e.hp -= dmg; msg.innerText = `${move.name}! ${dmg} dmg. ` + (typeMod>1?"Super Eficaz!":""); }
+            let p=player.pokemon, e=battle.enemy;
+            let m=p.moves[i];
+            let mod=(TYPE_MOD[m.type]&&TYPE_MOD[m.type][e.type])||1;
+            let dmg=m.power>0? Math.floor((((2*p.lvl/5+2)*m.power*(p.atk/e.def))/50)*mod)+2 : 0;
             
-            shake("enemy-img"); updateBars();
-
-            if(e.hp <= 0) {
-                setTimeout(() => winBattle(e), 1000);
-            } else {
-                setTimeout(() => enemyTurn(), 1000);
-            }
+            if(m.class==='status'){ e.def*=0.9; alert(m.name+": Defesa caiu!"); }
+            else { e.hp-=dmg; document.getElementById("battle-msg").innerText=`${m.name}! ${dmg} dmg`; }
+            
+            updateBars();
+            if(e.hp<=0) return winBattle();
+            setTimeout(enemyTurn, 1000);
         }
 
         function enemyTurn() {
-            let p = player.pokemon; let e = battle.enemy;
-            let move = e.moves[Math.floor(Math.random()*e.moves.length)] || {name:"Struggle", power:30, type:"normal"};
-            
-            let dmg = Math.floor((((2*e.level/5+2)*(move.power||20)*(e.stats.atk/p.stats.def))/50))+2;
-            p.hp -= dmg;
-            document.getElementById("battle-msg").innerText = `Inimigo usou ${move.name}! ${dmg} dmg.`;
-            shake("player-img"); updateBars();
-
-            if(p.hp <= 0) {
-                alert("Você desmaiou...");
-                p.hp = p.maxHp;
-                closeBattle();
-                player.x=4; player.y=4; player.px=192; player.py=192;
-            }
+            let p=player.pokemon, e=battle.enemy;
+            let m=e.moves[Math.floor(Math.random()*e.moves.length)]||{name:"Hit",power:20,type:"normal"};
+            let dmg=Math.floor((((2*e.lvl/5+2)*(m.power||20)*(e.atk/p.def))/50))+2;
+            p.hp-=dmg;
+            document.getElementById("battle-msg").innerText=`Enemy ${m.name}! ${dmg} dmg`;
+            updateBars();
+            if(p.hp<=0) { alert("Perdeu..."); p.hp=p.maxHp; closeBattle(); player.x=4; player.y=4; player.px=128; player.py=128; }
         }
 
-        async function winBattle(e) {
-            let p = player.pokemon;
-            let gainedXp = Math.floor((e.level * 20)); // XP formula simples
-            p.xp += gainedXp;
-            player.gold += e.level * 10;
-            alert(`Vitória! +${gainedXp} XP, +$${e.level*10}`);
-            
-            if(p.xp >= p.nextXp) {
-                p.level++; p.maxHp+=5; p.hp=p.maxHp; p.stats.atk+=2; p.stats.def+=2; p.nextXp=Math.pow(p.level+1,3);
-                alert(`Level Up para ${p.level}!`);
-                await checkNewMove(p);
+        async function winBattle() {
+            let p=player.pokemon;
+            let xp = battle.enemy.lvl*20; p.xp+=xp; player.gold+=battle.enemy.lvl*10;
+            alert(`Vitória! +${xp}XP +$${battle.enemy.lvl*10}`);
+            if(p.xp>=p.nextXp) {
+                p.lvl++; p.maxHp+=5; p.hp=p.maxHp; p.atk+=2; p.def+=2; p.nextXp=Math.pow(p.lvl+1,3);
+                alert("Level Up!");
+                await checkMove(p);
             }
             closeBattle();
         }
 
-        // --- SISTEMA DE APRENDIZAGEM DE MOVIMENTOS (NOVO) ---
-        async function checkNewMove(p) {
-            // Busca na lista rawMoves se tem golpe novo nesse nivel
-            let potential = p.rawMoves.filter(m => {
-                let v = m.version_group_details[0]; // Pega o primeiro grupo de versão simplificado
-                return v.level_learned_at === p.level && v.move_learn_method.name === 'level-up';
-            });
-
-            if(potential.length > 0) {
-                // Pega o primeiro golpe encontrado
-                let moveUrl = potential[0].move.url;
-                let moveData = await fetchMoveDetails(moveUrl);
-                
-                if(p.moves.length < 4) {
-                    p.moves.push(moveData);
-                    alert(`Aprendeu ${moveData.name}!`);
-                } else {
-                    // Abre tela de decisão
-                    pendingMove = moveData;
-                    openMoveScreen(moveData);
+        async function checkMove(p) {
+            let pool = p.rawMoves.filter(m => m.version_group_details[0].level_learned_at === p.lvl);
+            if(pool.length>0) {
+                let mRes = await fetch(pool[0].move.url); let mD = await mRes.json();
+                let newM = {name:mD.name, power:mD.power||0, type:mD.type.name, class:mD.damage_class.name};
+                if(p.moves.length<4) { p.moves.push(newM); alert("Aprendeu "+newM.name); }
+                else {
+                    pendingMove = newM;
+                    openMenu('learn');
                 }
             }
         }
 
-        function openMoveScreen(newMove) {
-            document.getElementById("move-screen").classList.add("active");
-            document.getElementById("new-move-name").innerText = newMove.name.toUpperCase();
-            
-            let list = document.getElementById("forget-list");
-            list.innerHTML = "";
-            player.pokemon.moves.forEach((m, i) => {
-                let div = document.createElement("div");
-                div.className = "move-card";
-                div.innerHTML = `<span>${m.name}</span> <small>${m.type}</small>`;
-                div.onclick = () => replaceMove(i);
-                list.appendChild(div);
-            });
+        // --- MENUS ---
+        function openBox() {
+            openMenu('box');
         }
+        function openMenu(type) {
+            let ov = document.getElementById("menu-overlay"); ov.classList.add("active");
+            let ct = document.getElementById("menu-content"); ct.innerHTML="";
+            document.getElementById("menu-title").innerText = type==='box'?"PC Box":"Aprender Golpe";
 
-        function replaceMove(index) {
-            let oldName = player.pokemon.moves[index].name;
-            player.pokemon.moves[index] = pendingMove;
-            alert(`Esqueceu ${oldName} e aprendeu ${pendingMove.name}!`);
-            document.getElementById("move-screen").classList.remove("active");
-            pendingMove = null;
-        }
-
-        function cancelLearnMove() {
-            alert(`Desistiu de aprender ${pendingMove.name}.`);
-            document.getElementById("move-screen").classList.remove("active");
-            pendingMove = null;
-        }
-
-        // --- UTILIDADES ---
-        function updateBars() {
-            let p=player.pokemon; let e=battle.enemy;
-            if(e) document.getElementById("enemy-hp").style.width=(Math.max(0,e.hp/e.maxHp)*100)+"%";
-            if(p) {
-                document.getElementById("player-hp").style.width=(Math.max(0,p.hp/p.maxHp)*100)+"%";
-                document.getElementById("hp-text").innerText=`${p.hp}/${p.maxHp}`;
-                let cur=Math.pow(p.level,3); let nxt=Math.pow(p.level+1,3);
-                document.getElementById("player-xp").style.width=((p.xp-cur)/(nxt-cur)*100)+"%";
+            if(type==='box') {
+                player.box.forEach(p => {
+                    ct.innerHTML += `<div class="menu-item"><img src="${p.sprites.front_default}" width="40">${p.name} Lv${p.lvl}</div>`;
+                });
+            } else if(type==='learn') {
+                ct.innerHTML = `<div class="new-move-highlight">Novo: ${pendingMove.name}</div><p>Trocar por qual?</p>`;
+                player.pokemon.moves.forEach((m,i) => {
+                    let b = document.createElement("div"); b.className="menu-item";
+                    b.innerHTML=`<b>${m.name}</b> (${m.type})`;
+                    b.onclick = () => { player.pokemon.moves[i]=pendingMove; alert("Trocou!"); closeMenu(); };
+                    ct.appendChild(b);
+                });
+                let cancel = document.createElement("button"); cancel.innerText="Não aprender";
+                cancel.onclick = closeMenu; ct.appendChild(cancel);
             }
         }
-        function shake(id){ let el=document.getElementById(id); el.classList.remove("anim-shake"); void el.offsetWidth; el.classList.add("anim-shake"); }
-        function closeBattle() { battle.active=false; document.getElementById("battle-screen").classList.remove("active"); document.getElementById("ui-gold").innerText=player.gold; }
-        
-        async function startGame(id) { 
-            let p = await fetchPokeData(id, 5); 
-            if(p) { player.pokemon=p; player.active=true; document.getElementById("start-screen").classList.remove("active"); updateBars(); loop(); } 
+        function closeMenu() { document.getElementById("menu-overlay").classList.remove("active"); }
+
+        // --- UTILS ---
+        function updateBars() {
+            let p=player.pokemon, e=battle.enemy;
+            if(e) document.getElementById("e-hp").style.width=Math.max(0,e.hp/e.maxHp*100)+"%";
+            if(p) {
+                document.getElementById("p-hp").style.width=Math.max(0,p.hp/p.maxHp*100)+"%";
+                document.getElementById("p-xp").style.width=((p.xp-Math.pow(p.lvl,3))/(p.nextXp-Math.pow(p.lvl,3))*100)+"%";
+                document.getElementById("ui-gold").innerText=player.gold;
+            }
         }
         function attemptCatch() { 
-            if(player.items.ball>0){ player.items.ball--; if(Math.random()>0.3){ player.box.push(battle.enemy); alert("Capturado!"); closeBattle(); }else alert("Escapou!"); }else alert("Sem bolas!"); 
-            document.getElementById("ui-gold").innerText = player.gold;
+            if(player.items.ball>0){ player.items.ball--; 
+            if(Math.random()>0.3){ player.box.push(battle.enemy); alert("Capturou!"); closeBattle(); } else alert("Escapou!"); } else alert("Sem bolas!"); 
+            updateBars();
         }
-        function usePotion(){ 
-            if(player.items.potion>0){ player.items.potion--; player.pokemon.hp=Math.min(player.pokemon.hp+20,player.pokemon.maxHp); updateBars(); document.getElementById("qty-potion").innerText=player.items.potion; } 
-        }
-        function runAway(){ closeBattle(); }
-        function toggleBox(){ 
-            let el=document.getElementById("box-screen"); el.classList.toggle("active"); 
-            if(el.classList.contains("active")) document.getElementById("box-grid").innerHTML = player.box.map(p=>`<div class="menu-item"><img src="${p.sprites.icon}"><br>${p.name}</div>`).join(''); 
-        }
-        function saveGame(){ localStorage.setItem('poke_tactician', JSON.stringify(player)); alert("Salvo!"); }
-        function loadGame(){ let d=localStorage.getItem('poke_tactician'); if(d){ player=JSON.parse(d); player.active=true; document.getElementById("start-screen").classList.remove("active"); loop(); }else alert("Sem save."); }
-        function changeRegion(v){ player.region=v; canvas.focus(); }
+        function usePotion() { if(player.items.potion>0){player.items.potion--; player.pokemon.hp=Math.min(player.pokemon.hp+20,player.pokemon.maxHp); updateBars();} }
+        function runAway() { closeBattle(); }
+        function closeBattle() { battle.active=false; document.getElementById("battle-screen").classList.remove("active"); }
+        function changeRegion(v){ player.region=v; }
+        
+        async function startGame(id) { player.pokemon=await fetchPoke(id,5); player.active=true; document.getElementById("start-screen").classList.remove("active"); loop(); updateBars(); }
+        function saveGame() { localStorage.setItem('poke_mobile', JSON.stringify(player)); alert("Salvo!"); }
+        function loadGame() { let d=localStorage.getItem('poke_mobile'); if(d){ player=JSON.parse(d); player.active=true; document.getElementById("start-screen").classList.remove("active"); loop(); updateBars(); } else alert("Sem save"); }
 
     </script>
 </body>
